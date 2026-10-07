@@ -1,6 +1,21 @@
+[![Watch the QuizLens demo](docs/quizlens-demo.jpg)](https://github.com/kevkoa2106/quizlens/blob/main/docs/quizlens-demo.mp4)
+
+[Watch the 20-second demo](https://github.com/kevkoa2106/quizlens/blob/main/docs/quizlens-demo.mp4)
+
 # QuizLens
 
 Read a multiple-choice question from your browser tab and compare answers with a model you choose. QuizLens works in Chrome and Firefox, showing one chosen answer and scores for each option.
+
+## Contents
+
+- [Install](#install)
+- [Use](#use)
+- [Models](#models)
+- [Laya setup](#laya-setup-optional)
+- [Data and limits](#data-and-limits)
+- [Development](#development)
+- [Tests](VERIFICATION.md)
+- [Third-party licenses](THIRD_PARTY.md)
 
 ## Install
 
