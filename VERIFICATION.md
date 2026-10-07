@@ -21,6 +21,7 @@ npm ci
 npx playwright install chromium firefox
 .venv/bin/python -m unittest discover -s tests -v
 npm test
+npm run package
 npm run test:browser
 ```
 

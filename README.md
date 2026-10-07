@@ -21,6 +21,8 @@ Read a multiple-choice question from your browser tab and compare answers with a
 
 Download your browser's ZIP from [the latest release](https://github.com/kevkoa2106/quizlens/releases/latest).
 
+For Firefox Add-ons submissions, upload **quizlens-firefox.zip** from the release assets. GitHub's **Source code (zip)** contains the repository and cannot be installed as an extension.
+
 - **Chrome 116+:** unzip, open `chrome://extensions`, enable Developer mode, and load the folder with **Load unpacked**.
 - **Firefox 142+:** open `about:debugging#/runtime/this-firefox`, choose **Load Temporary Add-on**, and select the ZIP. This unsigned installation lasts until Firefox restarts.
 
@@ -79,9 +81,12 @@ Requires Node 24+. Build both browser packages:
 ```sh
 git clone https://github.com/kevkoa2106/quizlens.git
 cd quizlens
+npm ci
 npm run build
 ```
 
 Output: `dist/chrome` and `dist/firefox`. For Firefox, load `dist/firefox/manifest.json` as a temporary add-on.
+
+Run `npm run package` to create `dist/quizlens-chrome.zip` and `dist/quizlens-firefox.zip`. Packaging checks the Firefox ZIP with Mozilla's validator and fails on errors or warnings.
 
 See [tests and verification](VERIFICATION.md) and [third-party licenses](THIRD_PARTY.md).

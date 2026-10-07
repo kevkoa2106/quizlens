@@ -1,1 +1,1 @@
-{"private":true,"type":"module","scripts":{"build":"node scripts/build.mjs","test":"node --test tests/*.test.js","test:browser":"playwright test"},"devDependencies":{"@playwright/test":"^1.63.0"}}
+{"private":true,"type":"module","scripts":{"build":"node scripts/build.mjs","package":"node scripts/package.mjs && npm run lint:firefox","lint:firefox":"addons-linter dist/quizlens-firefox.zip --warnings-as-errors","test":"node --test tests/*.test.js","test:browser":"playwright test"},"devDependencies":{"@playwright/test":"^1.63.0","addons-linter":"^10.13.0","fflate":"^0.8.3"}}
