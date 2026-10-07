@@ -15,6 +15,10 @@ Read a multiple-choice question from your browser tab and compare answers with a
 - [Data and limits](#data-and-limits)
 - [Development](#development)
 - [Tests](VERIFICATION.md)
+- [Privacy policy](PRIVACY.md)
+- [Contributing](CONTRIBUTING.md)
+- [Security reporting](SECURITY.md)
+- [License](LICENSE)
 - [Third-party licenses](THIRD_PARTY.md)
 
 ## Install
@@ -72,6 +76,8 @@ Keep the service running, select Laya, and paste its printed token. First use do
 
 Model settings and keys last for the browser session. The colour scheme is saved locally until the extension is removed. Captures go to your selected provider; cloud APIs may charge for usage. Local servers may also use cloud models, depending on their configuration.
 
+See the [privacy policy](PRIVACY.md) for data handling and deletion controls.
+
 Scores are model estimates, not calibrated probabilities. Tied choices are tentative. Unusual layouts may need manual correction or image mode. After changing tabs or websites, click the toolbar icon again to grant capture access.
 
 ## Development
@@ -89,4 +95,4 @@ Output: `dist/chrome` and `dist/firefox`. For Firefox, load `dist/firefox/manife
 
 Run `npm run package` to create `dist/quizlens-chrome.zip` and `dist/quizlens-firefox.zip`. Packaging checks the Firefox ZIP with Mozilla's validator and fails on errors or warnings.
 
-See [tests and verification](VERIFICATION.md) and [third-party licenses](THIRD_PARTY.md).
+QuizLens code uses [MIT](LICENSE). Laya and other dependencies retain their [upstream licenses](THIRD_PARTY.md). See [tests and verification](VERIFICATION.md) and [contribution guidance](CONTRIBUTING.md).

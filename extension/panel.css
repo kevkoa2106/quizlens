@@ -12,6 +12,7 @@ textarea { resize: vertical; }
 button { padding: 10px 14px; border: 0; border-radius: 4px; background: var(--accent); color: var(--button-text); font: inherit; font-weight: 600; cursor: pointer; }
 button:disabled { opacity: .6; cursor: wait; }
 :focus-visible { outline: 3px solid var(--accent); outline-offset: 3px; }
+a { color: var(--accent); }
 details, section { margin-top: 24px; border-top: 1px solid light-dark(#cccccc, #666666); padding-top: 12px; }
 summary { cursor: pointer; } #save { margin-top: 12px; }
 ol { padding: 0; list-style: none; } li { display: grid; grid-template-columns: 1fr auto; gap: 6px 10px; margin: 18px 0; }

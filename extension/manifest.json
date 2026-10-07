@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "QuizLens",
-  "version": "0.5.1",
+  "version": "0.5.2",
   "description": "Read quiz questions and compare answers with local models or your chosen API provider.",
   "permissions": [
     "activeTab",

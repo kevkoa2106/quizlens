@@ -20,13 +20,14 @@ test('Chrome and Firefox packages use their own supported sidebar manifests', ()
 
 test('store ZIPs contain runtime files and a browser-specific manifest at the root', () => {
   execFileSync(process.execPath, ['scripts/package.mjs']);
-  const expectedFiles = ['background.js', 'browser-api.js', 'core.js', 'dom.js', 'manifest.json', 'panel.css', 'panel.html', 'panel.js', 'providers.js'];
+  const expectedFiles = ['LICENSE', 'background.js', 'browser-api.js', 'core.js', 'dom.js', 'manifest.json', 'panel.css', 'panel.html', 'panel.js', 'providers.js'];
   for (const target of ['chrome', 'firefox']) {
     const files = unzipSync(readFileSync(`dist/quizlens-${target}.zip`));
     assert.deepEqual(Object.keys(files).sort(), expectedFiles);
     const manifest = JSON.parse(strFromU8(files['manifest.json']));
     assert.equal(manifest.version, JSON.parse(readFileSync('extension/manifest.json')).version);
     assert.ok(files['panel.html']);
+    assert.equal(strFromU8(files.LICENSE), readFileSync('LICENSE', 'utf8'));
     if (target === 'firefox') {
       assert.equal(manifest.background.service_worker, undefined);
       assert.equal(manifest.side_panel, undefined);

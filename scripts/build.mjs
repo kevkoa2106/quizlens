@@ -5,6 +5,7 @@ for (const target of ['chrome', 'firefox']) {
   await rm(directory, { recursive: true, force: true });
   await mkdir(directory, { recursive: true });
   await cp(new URL('../extension/', import.meta.url), directory, { recursive: true });
+  await cp(new URL('../LICENSE', import.meta.url), new URL('LICENSE', directory));
   const manifest = JSON.parse(await readFile(new URL('manifest.json', directory), 'utf8'));
   if (target === 'firefox') {
     manifest.permissions = manifest.permissions.filter(value => value !== 'sidePanel');
