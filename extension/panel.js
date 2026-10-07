@@ -8,6 +8,23 @@ const status = byId('status');
 const question = byId('question');
 const options = byId('options');
 const token = byId('token');
+const themes = ['green', 'blue', 'red', 'grey'];
+function applyTheme(theme) {
+  const selected = themes.includes(theme) ? theme : 'green';
+  document.documentElement.dataset.theme = selected;
+  byId('theme').value = selected;
+}
+try { applyTheme((await extensionApi.storage.local.get('theme')).theme); }
+catch { applyTheme('green'); }
+byId('theme').addEventListener('change', async () => {
+  applyTheme(byId('theme').value);
+  try {
+    await extensionApi.storage.local.set({ theme: byId('theme').value });
+    byId('theme-status').textContent = 'Colour scheme saved on this device.';
+  } catch {
+    byId('theme-status').textContent = 'Colour scheme applied, but could not be saved. Try again.';
+  }
+});
 let revision = 0;
 let capturedImage = '';
 function imageMode() { return byId('provider').value !== 'laya' && byId('input-mode').value === 'image'; }

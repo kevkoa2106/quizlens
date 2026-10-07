@@ -32,6 +32,8 @@ Download your browser's ZIP from [the latest release](https://github.com/kevkoa2
 
 For image or canvas questions, select **Image (vision model)** and capture the tab or upload a PNG/JPEG. Your model must support images. QuizLens does not click or submit answers.
 
+In **Appearance**, choose green, blue, red, or grey. Colours follow your browser's light or dark mode; the choice stays on this device.
+
 ## Models
 
 | Provider | Settings |
@@ -66,7 +68,7 @@ Keep the service running, select Laya, and paste its printed token. First use do
 
 ## Data and limits
 
-Settings and keys last for the browser session. Captures go to your selected provider; cloud APIs may charge for usage. Local servers may also use cloud models, depending on their configuration.
+Model settings and keys last for the browser session. The colour scheme is saved locally until the extension is removed. Captures go to your selected provider; cloud APIs may charge for usage. Local servers may also use cloud models, depending on their configuration.
 
 Scores are model estimates, not calibrated probabilities. Tied choices are tentative. Unusual layouts may need manual correction or image mode. After changing tabs or websites, click the toolbar icon again to grant capture access.
 

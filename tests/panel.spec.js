@@ -7,7 +7,13 @@ test.beforeEach(async ({ page, browserName }) => {
   const screenshot = 'data:image/png;base64,' + (await fs.readFile('tests/quiz.png')).toString('base64');
   await page.addInitScript(({ isFirefox, screenshot }) => {
     window.chrome = {
-      storage: { session: { get: async () => ({ provider: 'laya' }), set: async settings => { window.savedSettings = settings; } } },
+      storage: {
+        session: { get: async () => ({ provider: 'laya' }), set: async settings => { window.savedSettings = settings; } },
+        local: {
+          get: async () => ({ theme: sessionStorage.getItem('test-theme') }),
+          set: async settings => { sessionStorage.setItem('test-theme', settings.theme); }
+        }
+      },
       permissions: { contains: async () => true, request: async request => { window.requestedOrigins = request.origins; return true; } },
       tabs: { query: async () => [{ id: 42 }], captureVisibleTab: async () => { window.screenshotCalls = (window.screenshotCalls || 0) + 1; return screenshot; } },
       scripting: { executeScript: async () => [{ result: { question: 'Encryption output?', options: ['Ciphertext', '<img src=x onerror=alert(1)>'], raw_text: 'Encryption output?\nCiphertext\nPlaintext' } }] }
@@ -15,6 +21,61 @@ test.beforeEach(async ({ page, browserName }) => {
     if (isFirefox) window.browser = window.chrome;
   }, { isFirefox: browserName === 'firefox', screenshot });
   await page.goto('/panel.html');
+});
+
+test('themes apply immediately, persist, and retain readable contrast in light and dark modes', async ({ page }) => {
+  await expect(page.locator('html')).toHaveAttribute('data-theme', 'green');
+  const colours = new Set();
+  for (const theme of ['green', 'blue', 'red', 'grey']) {
+    await page.getByText('Appearance', { exact: true }).click();
+    await page.locator('#theme').selectOption(theme);
+    await expect(page.locator('#theme-status')).toContainText('saved');
+    expect(await page.evaluate(() => window.savedSettings)).toBeUndefined();
+    for (const colorScheme of ['light', 'dark']) {
+      await page.emulateMedia({ colorScheme });
+      const { background, ratio } = await page.locator('#capture').evaluate(button => {
+        const style = getComputedStyle(button);
+        const luminance = colour => {
+          const channels = colour.match(/[\d.]+/g).slice(0, 3).map(Number).map(value => {
+            const s = value / 255;
+            return s <= .04045 ? s / 12.92 : ((s + .055) / 1.055) ** 2.4;
+          });
+          return channels[0] * .2126 + channels[1] * .7152 + channels[2] * .0722;
+        };
+        const a = luminance(style.backgroundColor), b = luminance(style.color);
+        return { background: style.backgroundColor, ratio: (Math.max(a, b) + .05) / (Math.min(a, b) + .05) };
+      });
+      colours.add(background);
+      expect(ratio).toBeGreaterThanOrEqual(4.5);
+    }
+    await page.reload();
+    await expect(page.locator('html')).toHaveAttribute('data-theme', theme);
+    await expect(page.locator('#theme')).toHaveValue(theme);
+  }
+  expect(colours.size).toBe(8);
+});
+
+test('invalid saved themes fall back to green and storage errors leave the panel usable', async ({ page }) => {
+  await page.evaluate(() => sessionStorage.setItem('test-theme', 'invalid'));
+  await page.reload();
+  await expect(page.locator('html')).toHaveAttribute('data-theme', 'green');
+  await page.evaluate(() => { chrome.storage.local.set = async () => { throw new Error('Unavailable'); }; });
+  await page.getByText('Appearance', { exact: true }).click();
+  await page.locator('#theme').selectOption('blue');
+  await expect(page.locator('html')).toHaveAttribute('data-theme', 'blue');
+  await expect(page.locator('#theme-status')).toContainText('could not be saved');
+  await expect(page.locator('#capture')).toBeEnabled();
+});
+
+test('unavailable theme storage falls back without blocking model settings', async ({ page }) => {
+  await page.addInitScript(() => {
+    chrome.storage.local.get = async () => { throw new Error('Unavailable'); };
+  });
+  await page.reload();
+  await expect(page.locator('html')).toHaveAttribute('data-theme', 'green');
+  await expect(page.locator('#capture')).toBeEnabled();
+  await page.locator('#settings summary').click();
+  await expect(page.locator('#provider')).toHaveValue('laya');
 });
 
 test('DOM capture automatically compares, safely renders and clears stale results', async ({ page }) => {
@@ -101,6 +162,12 @@ test('actual extension loads its worker and registers the side panel', async ({ 
     const panel = await context.newPage();
     await panel.goto(`chrome-extension://${extensionId}/panel.html`);
     await expect(panel.locator('#capture')).toBeEnabled();
+    await panel.getByText('Appearance', { exact: true }).click();
+    await panel.locator('#theme').selectOption('blue');
+    await expect(panel.locator('#theme-status')).toContainText('saved');
+    expect(await worker.evaluate(async () => (await chrome.storage.local.get('theme')).theme)).toBe('blue');
+    await panel.reload();
+    await expect(panel.locator('html')).toHaveAttribute('data-theme', 'blue');
     await panel.locator('#settings summary').click();
     await panel.locator('#provider').selectOption('laya');
     await panel.locator('#token').fill('smoke-token');
