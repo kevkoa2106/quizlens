@@ -1,0 +1,28 @@
+{
+  "manifest_version": 3,
+  "name": "QuizLens",
+  "version": "0.4.1",
+  "description": "Read a question from the visible tab and compare Laya's answer estimates locally.",
+  "permissions": [
+    "activeTab",
+    "sidePanel",
+    "storage",
+    "scripting"
+  ],
+  "host_permissions": [
+    "http://127.0.0.1:8765/*"
+  ],
+  "action": {
+    "default_title": "Open QuizLens"
+  },
+  "background": {
+    "service_worker": "background.js"
+  },
+  "side_panel": {
+    "default_path": "panel.html"
+  },
+  "content_security_policy": {
+    "extension_pages": "script-src 'self'; object-src 'self'; connect-src http://127.0.0.1:8765"
+  },
+  "minimum_chrome_version": "116"
+}
