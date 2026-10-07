@@ -1,5 +1,5 @@
-# Third-party dependencies
+# Third-party licenses
 
-QuizLens uses [Laya](https://github.com/NandhaKishorM/laya), distributed under Apache-2.0. The setup script downloads revision `8a6e1328cce2460a0e5aa348ad465bb1b5821cd2` into `vendor/laya` and installs that checkout. The directory is excluded from this repository; its upstream license and notices remain with the downloaded source.
+[Laya](https://github.com/NandhaKishorM/laya) uses Apache-2.0. Setup downloads the revision in [LAYA_REVISION](LAYA_REVISION) to `vendor/laya`, preserving upstream licenses and notices.
 
-Python dependencies are listed in `requirements.txt` and `requirements-test.txt`. Browser-test dependencies are recorded in `package.json` and `package-lock.json`. These packages retain their respective upstream licenses.
+Dependencies are listed in [requirements.txt](requirements.txt), [requirements-test.txt](requirements-test.txt), and [package.json](package.json), with browser dependencies pinned in [package-lock.json](package-lock.json). Each retains its upstream license.
