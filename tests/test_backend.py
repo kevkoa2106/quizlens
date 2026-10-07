@@ -136,6 +136,10 @@ class HTTPTests(unittest.TestCase):
 
     def test_preflight(self):
         self.assertEqual(self.call(method='OPTIONS')[0], 200)
+        self.assertEqual(self.call(origin='moz-extension://test', method='OPTIONS')[0], 200)
+        status, _, headers = self.call(origin='moz-extension://test')
+        self.assertEqual(status, 200)
+        self.assertEqual(headers['Access-Control-Allow-Origin'], 'moz-extension://test')
 
     def test_bad_requests(self):
         for body in ('not json', '[]', ''):

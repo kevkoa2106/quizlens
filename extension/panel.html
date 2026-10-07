@@ -2,21 +2,34 @@
 <html lang="en">
 <head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>QuizLens</title><link rel="stylesheet" href="panel.css"></head>
 <body>
-  <header><h1>QuizLens</h1><p>Capture and compare automatically.</p><p>Open this panel using the QuizLens toolbar icon on the tab you want to capture.</p><button id="capture" type="button">Capture this tab</button></header>
-  <p id="status" role="status" aria-live="polite">Start the local service and add its token below.</p>
-  <details id="settings"><summary>Service settings</summary><label for="token">Service token</label><input id="token" type="password" autocomplete="off"><label for="provider">Answer provider</label><select id="provider"><option value="laya">Laya</option><option value="local_api">Local API (LM Studio)</option></select>
-    <div id="local-settings" hidden><label for="input-mode">Input mode</label><select id="input-mode"><option value="text">Page text (DOM)</option><option value="image">Image (vision model)</option></select><p>Image mode sends the screenshot directly to a vision-capable model, without OCR.</p><label for="base-url">API base URL</label><input id="base-url" type="url" value="http://127.0.0.1:1234/v1"><label for="model">Model identifier</label><input id="model" placeholder="Model identifier from LM Studio"><label for="structured-json"><input id="structured-json" type="checkbox" checked> Require JSON output</label><label for="no-thinking"><input id="no-thinking" type="checkbox" checked> Request non-thinking mode (Qwen-compatible)</label><label for="max-tokens">Output token limit</label><input id="max-tokens" type="number" min="128" max="8192" step="1" value="512"><p>Some servers ignore the thinking flag. Disable thinking in LM Studio if it still produces long reasoning. Turn off unsupported options for other APIs.</p><label for="api-key">API key (optional)</label><input id="api-key" type="password" autocomplete="off"><p>Start your local server and enter its model identifier. The API must support OpenAI-compatible chat completions.</p></div>
-    <button id="save" type="button">Save settings for this session</button><p>Screenshots and answers are processed on this computer.</p></details>
+  <header><h1>QuizLens</h1><p>Capture and compare automatically.</p><p>Click the QuizLens toolbar icon on the tab you want to capture.</p><button id="capture" type="button">Capture this tab</button></header>
+  <p id="status" role="status" aria-live="polite">Choose a provider and model in settings, then capture a question.</p>
+  <details id="settings"><summary>Model settings</summary>
+    <label for="provider">Answer provider</label><select id="provider"><option value="local_api">LM Studio / local API</option><option value="ollama">Ollama</option><option value="openai">OpenAI</option><option value="anthropic">Anthropic</option><option value="laya">Laya (Python service)</option></select>
+    <p id="provider-note"></p>
+    <div id="laya-settings" hidden><label for="token">Laya service token</label><input id="token" type="password" autocomplete="off"><p>Run the optional Laya service and paste its printed token.</p></div>
+    <div id="local-settings">
+      <label for="input-mode">Input mode</label><select id="input-mode"><option value="text">Page text (DOM)</option><option value="image">Image (vision model)</option></select>
+      <p>Image mode requires a model that supports images.</p>
+      <div id="endpoint-settings"><label for="base-url">API base URL</label><input id="base-url" type="url" value="http://127.0.0.1:1234/v1"></div>
+      <label for="model">Model identifier</label><input id="model" placeholder="Model identifier from your provider">
+      <div id="json-settings"><label for="structured-json"><input id="structured-json" type="checkbox" checked> Require JSON output</label></div>
+      <div id="thinking-settings"><label for="no-thinking"><input id="no-thinking" type="checkbox" checked> Request non-thinking mode</label><p>Turn off options your model server does not support.</p></div>
+      <label for="max-tokens">Output token limit</label><input id="max-tokens" type="number" min="128" max="8192" step="1" value="512">
+      <label id="api-key-label" for="api-key">API key (optional)</label><input id="api-key" type="password" autocomplete="off">
+    </div>
+    <button id="save" type="button">Save settings for this session</button><p>Keys and settings stay in this browser session. Saving requests access only to the selected provider.</p>
+  </details>
   <form id="question-form">
     <div id="image-fields" hidden><label for="image-upload">Choose a PNG or JPEG image</label><input id="image-upload" type="file" accept="image/png,image/jpeg"><p>Tab capture compares automatically. For an uploaded image, choose Compare answers.</p><img id="image-preview" alt="Captured or uploaded question" hidden></div>
     <div id="text-fields">
-    <label for="question">Question</label><textarea id="question" rows="4" maxlength="2000" required placeholder="Capture a question or enter one here."></textarea>
-    <label for="options">Answers, one per line</label><textarea id="options" rows="5" required placeholder="First option&#10;Second option"></textarea>
-    <p>Capture automatically compares the visible question. Correct the text and compare again if needed. A, B, C follow the order above.</p>
+      <label for="question">Question</label><textarea id="question" rows="4" maxlength="2000" required placeholder="Capture a question or enter one here."></textarea>
+      <label for="options">Answers, one per line</label><textarea id="options" rows="5" required placeholder="First option&#10;Second option"></textarea>
+      <p>Capture automatically compares the visible question. Correct the text and compare again if needed. A, B, C follow the order above.</p>
     </div>
     <button id="analyze" type="submit">Compare answers</button>
   </form>
-  <section aria-labelledby="results-title"><h2 id="results-title">Model estimates</h2><p id="verdict">Your estimates will appear here.</p><ol id="answers"></ol><p id="probability-note" class="note">Percentages reflect Laya's preferences among these options. They have not been calibrated on your quizzes and can be confidently wrong.</p></section>
+  <section aria-labelledby="results-title"><h2 id="results-title">Model estimates</h2><p id="verdict">Your estimates will appear here.</p><ol id="answers"></ol><p id="probability-note" class="note">Model estimates are not calibrated chances of correctness.</p></section>
   <details><summary>Extracted text</summary><pre id="raw">No question captured yet.</pre></details>
   <script type="module" src="panel.js"></script>
 </body></html>

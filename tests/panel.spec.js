@@ -3,14 +3,17 @@ import path from 'node:path';
 import os from 'node:os';
 import fs from 'node:fs/promises';
 
-test.beforeEach(async ({ page }) => {
-  await page.addInitScript(() => {
+test.beforeEach(async ({ page, browserName }) => {
+  const screenshot = 'data:image/png;base64,' + (await fs.readFile('tests/quiz.png')).toString('base64');
+  await page.addInitScript(({ isFirefox, screenshot }) => {
     window.chrome = {
-      storage: { session: { get: async () => ({}), set: async settings => { window.savedSettings = settings; } } },
-      tabs: { query: async () => [{ id: 42 }], captureVisibleTab: async () => { window.screenshotCalls = (window.screenshotCalls || 0) + 1; return 'data:image/png;base64,test'; } },
+      storage: { session: { get: async () => ({ provider: 'laya' }), set: async settings => { window.savedSettings = settings; } } },
+      permissions: { contains: async () => true, request: async request => { window.requestedOrigins = request.origins; return true; } },
+      tabs: { query: async () => [{ id: 42 }], captureVisibleTab: async () => { window.screenshotCalls = (window.screenshotCalls || 0) + 1; return screenshot; } },
       scripting: { executeScript: async () => [{ result: { question: 'Encryption output?', options: ['Ciphertext', '<img src=x onerror=alert(1)>'], raw_text: 'Encryption output?\nCiphertext\nPlaintext' } }] }
     };
-  });
+    if (isFirefox) window.browser = window.chrome;
+  }, { isFirefox: browserName === 'firefox', screenshot });
   await page.goto('/panel.html');
 });
 
@@ -81,7 +84,8 @@ test('edits during inference discard the response', async ({ page }) => {
   await expect(page.locator('#answers li')).toHaveCount(0);
 });
 
-test('actual extension loads its worker and registers the side panel', async () => {
+test('actual extension loads its worker and registers the side panel', async ({ browserName }) => {
+  test.skip(browserName !== 'chromium', 'The Firefox package is checked separately; Playwright cannot install Firefox add-ons.');
   const profile = await fs.mkdtemp(path.join(os.tmpdir(), 'laya-extension-'));
   const extensionPath = path.resolve('extension');
   const context = await chromium.launchPersistentContext(profile, {
@@ -98,12 +102,14 @@ test('actual extension loads its worker and registers the side panel', async () 
     await panel.goto(`chrome-extension://${extensionId}/panel.html`);
     await expect(panel.locator('#capture')).toBeEnabled();
     await panel.locator('#settings summary').click();
+    await panel.locator('#provider').selectOption('laya');
     await panel.locator('#token').fill('smoke-token');
     await panel.locator('#save').click();
     expect(await worker.evaluate(async () => (await chrome.storage.session.get('token')).token)).toBe('smoke-token');
     await panel.locator('#settings summary').click();
     await panel.locator('#provider').selectOption('local_api');
     await panel.locator('#model').fill('saved-local-model');
+    await panel.evaluate(() => { chrome.permissions.request = async () => true; });
     await panel.locator('#save').click();
     await panel.reload();
     await panel.locator('#settings summary').click();
@@ -149,7 +155,6 @@ test('local API settings are saved and sent with provider-specific estimates', a
   await expect(page.locator('#local-settings')).toBeHidden();
   await page.locator('#provider').selectOption('local_api');
   await expect(page.locator('#local-settings')).toBeVisible();
-  await page.locator('#token').fill('service-token');
   await page.locator('#base-url').fill('http://localhost:1234/v1');
   await page.locator('#model').fill('local-chat-model');
   await page.locator('#api-key').fill('local-key');
@@ -157,15 +162,16 @@ test('local API settings are saved and sent with provider-specific estimates', a
   expect(await page.evaluate(() => window.savedSettings)).toMatchObject({ provider: 'local_api', model: 'local-chat-model', api_key: 'local-key', structured_json: true, no_thinking: true, max_tokens: 512 });
   await page.locator('#question').fill('3x9');
   await page.locator('#options').fill('32\n27');
-  await page.route('http://127.0.0.1:8765/analyze', async route => {
-    expect(route.request().postDataJSON()).toMatchObject({ provider: 'local_api', base_url: 'http://localhost:1234/v1', model: 'local-chat-model', api_key: 'local-key', structured_json: true, no_thinking: true, max_tokens: 512 });
-    await route.fulfill({ json: { answers: [{ index: 1, text: '27', probability: .9 }, { index: 0, text: '32', probability: .1 }], uncertain: false,
-      model: 'local-chat-model', provider_label: 'Local model', method: 'model-reported estimates', probability_note: 'Estimates reported by the chat model.' } });
+  expect(await page.evaluate(() => window.requestedOrigins)).toEqual(['http://localhost/*']);
+  await page.route('http://localhost:1234/v1/chat/completions', async route => {
+    expect(route.request().postDataJSON()).toMatchObject({ model: 'local-chat-model', max_tokens: 512 });
+    expect(route.request().headers().authorization).toBe('Bearer local-key');
+    await route.fulfill({ json: { choices: [{ message: { content: '{"best_index":1,"probabilities":[0.1,0.9]}' } }] } });
   });
   await page.locator('#analyze').click();
   await expect(page.locator('#verdict')).toContainText('Local model favors B. 27');
   await expect(page.locator('#status')).toContainText('model-reported estimates');
-  await expect(page.locator('#probability-note')).toContainText('chat model');
+  await expect(page.locator('#probability-note')).toContainText('reported by the model');
   await page.locator('#settings summary').click();
   await page.locator('#provider').selectOption('laya');
   await expect(page.locator('#answers li')).toHaveCount(0);
@@ -176,11 +182,10 @@ test('local API settings are saved and sent with provider-specific estimates', a
 test('model token-limit errors are visible and controls recover', async ({ page }) => {
   await page.locator('#settings summary').click();
   await page.locator('#provider').selectOption('local_api');
-  await page.locator('#token').fill('token');
   await page.locator('#model').fill('qwen');
   await page.locator('#question').fill('6x4');
   await page.locator('#options').fill('24\n18\n21\n14');
-  await page.route('http://127.0.0.1:8765/analyze', route => route.fulfill({ status: 502, json: { error: 'The model hit its output token limit before returning complete JSON.' } }));
+  await page.route('http://127.0.0.1:1234/v1/chat/completions', route => route.fulfill({ json: { choices: [{ message: { content: '{}' }, finish_reason: 'length' }] } }));
   await page.locator('#analyze').click();
   await expect(page.locator('#status')).toContainText('output token limit');
   await expect(page.locator('#analyze')).toBeEnabled();
@@ -192,7 +197,6 @@ test('image capture skips OCR and renders model-read answers without text fields
   await page.locator('#settings summary').click();
   await page.locator('#provider').selectOption('local_api');
   await page.locator('#input-mode').selectOption('image');
-  await page.locator('#token').fill('token');
   await page.locator('#model').fill('vision-model');
   await page.locator('#save').click();
   expect(await page.evaluate(() => window.savedSettings.input_mode)).toBe('image');
@@ -200,16 +204,16 @@ test('image capture skips OCR and renders model-read answers without text fields
   await page.locator('#analyze').click();
   await expect(page.locator('#status')).toContainText('Capture a tab or choose an image first');
   let paths = [];
-  await page.route('http://127.0.0.1:8765/**', async route => {
+  await page.route('http://127.0.0.1:1234/**', async route => {
     paths.push(new URL(route.request().url()).pathname);
-    expect(route.request().postDataJSON()).toMatchObject({ input_mode: 'image', image: 'data:image/png;base64,test' });
-    await route.fulfill({ json: { input_mode: 'image', question: '3x9', options: ['32', '27'], answers: [{ index: 1, text: '27', probability: .9 }, { index: 0, text: '32', probability: .1 }], model: 'vision-model', provider_label: 'Local model', uncertain: false } });
+    expect(route.request().postDataJSON().messages[1].content[1].image_url.url).toMatch(/^data:image\/jpeg;base64,/);
+    await route.fulfill({ json: { choices: [{ message: { content: JSON.stringify({ question: '3x9', options: ['32', '27'], best_index: 1, probabilities: [.1, .9] }) } }] } });
   });
   await page.locator('#capture').click();
 
   await expect(page.locator('#answers')).toContainText('27');
   await expect(page.locator('#verdict')).toContainText('B. 27');
-  expect(paths).toEqual(['/analyze']);
+  expect(paths).toEqual(['/v1/chat/completions']);
   await page.locator('#settings summary').click();
   await page.locator('#provider').selectOption('laya');
   await expect(page.locator('#text-fields')).toBeVisible();
@@ -223,7 +227,8 @@ test('image upload previews a PNG and rejects unsupported file types', async ({ 
   await page.locator('#image-upload').setInputFiles(path.resolve('tests/quiz.png'));
   await expect(page.locator('#status')).toContainText('Image loaded');
   await expect(page.locator('#image-preview')).toBeVisible();
-  expect(await page.locator('#image-preview').getAttribute('src')).toMatch(/^data:image\/png;base64,/);
+  expect(await page.locator('#image-preview').getAttribute('src')).toMatch(/^data:image\/jpeg;base64,/);
+  expect(await page.locator('#image-preview').evaluate(image => Math.max(image.naturalWidth, image.naturalHeight))).toBeLessThanOrEqual(1600);
   await page.locator('#image-upload').setInputFiles({ name: 'bad.txt', mimeType: 'text/plain', buffer: Buffer.from('bad') });
   await expect(page.locator('#status')).toContainText('PNG or JPEG');
   await expect(page.locator('#image-preview')).toBeHidden();
@@ -272,3 +277,49 @@ for (const count of [2, 3, 4]) {
     await expect(page.locator('#probability-note')).toContainText('explicitly selected');
   });
 }
+
+for (const provider of ['ollama', 'openai', 'anthropic']) {
+  test(`${provider} captures and compares without a service token`, async ({ page }) => {
+    await page.locator('#settings summary').click();
+    await page.locator('#provider').selectOption(provider);
+    await expect(page.locator('#token')).toBeHidden();
+    await page.locator('#model').fill('test-model');
+    if (provider !== 'ollama') {
+      await page.locator('#api-key').fill('test-key');
+      await expect(page.locator('#provider-note')).toContainText('sent to this provider');
+    }
+    const endpoint = provider === 'ollama' ? 'http://127.0.0.1:11434/api/chat' : provider === 'openai' ? 'https://api.openai.com/v1/chat/completions' : 'https://api.anthropic.com/v1/messages';
+    let calls = 0;
+    await page.route(endpoint, async route => {
+      calls++;
+      const body = route.request().postDataJSON();
+      expect(body.model).toBe('test-model');
+      const content = JSON.stringify({ best_index: 0, probabilities: [.9, .1] });
+      await route.fulfill({ json: provider === 'anthropic' ? { content: [{ type: 'text', text: content }] } : provider === 'ollama' ? { message: { content } } : { choices: [{ message: { content } }] } });
+    });
+    await page.route('http://127.0.0.1:8765/**', () => { throw new Error('Unexpected Python service request'); });
+    await page.locator('#save').click();
+    await page.locator('#capture').click();
+    await expect(page.locator('.chosen-answer')).toContainText('Ciphertext');
+    await expect(page.locator('#status')).toContainText('Compared with test-model');
+    expect(calls).toBe(1);
+  });
+}
+
+test('declining provider permission prevents comparison requests', async ({ page }) => {
+  await page.evaluate(() => {
+    chrome.permissions.request = async () => false;
+    chrome.permissions.contains = async () => false;
+  });
+  await page.locator('#settings summary').click();
+  await page.locator('#provider').selectOption('openai');
+  await page.locator('#api-key').fill('test-key');
+  await page.locator('#model').fill('test-model');
+  let calls = 0;
+  await page.route('https://api.openai.com/**', () => { calls++; });
+  await page.locator('#save').click();
+  await expect(page.locator('#status')).toContainText('declined');
+  await page.locator('#capture').click();
+  await expect(page.locator('#status')).toContainText('allow access');
+  expect(calls).toBe(0);
+});

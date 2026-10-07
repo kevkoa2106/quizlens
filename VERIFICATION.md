@@ -2,7 +2,7 @@
 
 ## Latest local run
 
-Verified on macOS with Python 3.13, Node 24, and Tesseract: 32 Python tests, 7 JavaScript unit tests, and 21 browser tests pass. One optional real-Laya checkpoint test is skipped. The pinned test dependencies resolve from the package index for a fresh installation.
+The backend suite includes 32 passing checks and one optional real-Laya checkpoint test. Provider and browser coverage now includes direct requests, native Ollama, cloud credentials, provider-scoped permissions, browser-side image preparation, and Chrome/Firefox package generation. The linked initial CI failure was an OCR fixture punctuation difference; the existing fix keeps answer text/order assertions while permitting a trailing period.
 
 ## Test coverage
 
@@ -16,15 +16,15 @@ GitHub Actions runs the suites on pushes and pull requests. The optional real-ch
 
 ## Verification limits
 
-Panel tests simulate Chrome capture APIs and model responses. They do not exercise a toolbar permission grant on a live quiz website. DOM fixtures verify the extraction rules, but a particular site can use a layout they do not cover.
+Panel tests simulate extension capture APIs and model responses. They do not exercise a toolbar permission grant on a live quiz website. DOM fixtures verify the extraction rules, but a particular site can use a layout they do not cover. Chromium loads the actual extension worker and panel. Firefox panel/DOM tests use its real browser engine with simulated extension APIs; Playwright cannot install Firefox add-ons. The Firefox package is checked by build tests and Mozilla's add-on linter. Store signing and permanent Firefox installation are not part of these checks.
 
-The local API adapter is tested using real loopback HTTP servers with simulated completions. These tests do not establish a particular model's accuracy, latency, or vision capabilities. A loaded vision model must be checked separately.
+Provider tests validate request bodies and headers for LM Studio, Ollama, OpenAI, and Anthropic, including image formats, short JSON prompts, chosen-answer identity, invalid scores, complete constrained JSON, token-limit errors, timeout errors, and credential/endpoint validation. No paid cloud API is called by the tests. These checks do not establish a particular model's accuracy, latency, or vision capabilities.
 
 ## Interface review
 
 The chosen answer is the result panel's focal point. Original A/B/C labels preserve answer identity when scores are ranked. The green accent marks actions and the chosen answer; system fonts support small-panel reading. Spacing separates settings, captured text, and results. Native controls, visible focus, status announcements, and the system light/dark preference support keyboard use.
 
-The interface uses restrained emphasis, consistent reading order, and no decorative motion: ENERGY 1 / RHYTHM 1 / MOTION 1. This publication update changes the product name and documentation, without redesigning the existing layout.
+The interface uses restrained emphasis, consistent reading order, and no decorative motion: ENERGY 1 / RHYTHM 1 / MOTION 1. Provider settings show only relevant fields, and cloud choices state where captured data is sent. No decorative controls are added.
 
 ## Publication review
 

@@ -18,7 +18,7 @@ def make_handler(token, solver, extract=extract_image, local_solver=analyze_loca
 
         def origin_allowed(self):
             origin = self.headers.get('Origin')
-            return origin is None or (urlparse(origin).scheme == 'chrome-extension' and
+            return origin is None or (urlparse(origin).scheme in ('chrome-extension', 'moz-extension') and
                                       bool(urlparse(origin).netloc) and urlparse(origin).path == '')
 
         def reply(self, status, body):

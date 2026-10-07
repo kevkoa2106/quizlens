@@ -1,5 +1,7 @@
 // Explicit action handling keeps the toolbar click tied to activeTab access.
-chrome.sidePanel.setPanelBehavior({ openPanelOnActionClick: false }).catch(console.error);
-chrome.action.onClicked.addListener(tab => {
-  chrome.sidePanel.open({ windowId: tab.windowId }).catch(console.error);
+const extensionApi = globalThis.browser ?? globalThis.chrome;
+extensionApi.sidePanel?.setPanelBehavior({ openPanelOnActionClick: false }).catch(console.error);
+extensionApi.action.onClicked.addListener(tab => {
+  const opening = extensionApi.sidePanel ? extensionApi.sidePanel.open({ windowId: tab.windowId }) : extensionApi.sidebarAction.open();
+  opening.catch(console.error);
 });

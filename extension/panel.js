@@ -1,5 +1,7 @@
 import { parseOptions, validateInput, request, renderAnswers } from './core.js';
 import { captureDOM } from './dom.js';
+import { extensionApi } from './browser-api.js';
+import { analyzeProvider, providerOrigin } from './providers.js';
 
 const byId = id => document.getElementById(id);
 const status = byId('status');
@@ -8,7 +10,19 @@ const options = byId('options');
 const token = byId('token');
 let revision = 0;
 let capturedImage = '';
-function imageMode() { return byId('provider').value === 'local_api' && byId('input-mode').value === 'image'; }
+function imageMode() { return byId('provider').value !== 'laya' && byId('input-mode').value === 'image'; }
+function updateProvider() {
+  const provider = byId('provider').value;
+  const cloud = ['openai', 'anthropic'].includes(provider);
+  byId('local-settings').hidden = provider === 'laya';
+  byId('laya-settings').hidden = provider !== 'laya';
+  byId('endpoint-settings').hidden = cloud;
+  byId('thinking-settings').hidden = cloud;
+  byId('json-settings').hidden = provider === 'anthropic';
+  byId('provider-note').textContent = cloud ? 'Captured questions and images are sent to this provider using your API key. API usage may incur charges. Your key stays in this browser session; QuizLens has no shared server.' : provider === 'laya' ? 'Laya needs the Python service on this computer. Its token protects the service from website requests.' : 'Calls your model server directly. No QuizLens service or token is needed.';
+  byId('api-key-label').textContent = cloud ? 'Provider API key' : 'API key (optional)';
+  updateInputMode();
+}
 function updateInputMode() {
   byId('text-fields').hidden = imageMode();
   byId('image-fields').hidden = !imageMode();
@@ -20,9 +34,31 @@ function setImage(image) {
   byId('image-preview').hidden = false;
   byId('raw').textContent = 'Image mode: the vision model will read the question and answers when you compare.';
 }
-const settings = await chrome.storage.session.get(['token', 'provider', 'base_url', 'model', 'api_key', 'structured_json', 'no_thinking', 'max_tokens', 'input_mode']);
+async function prepareImage(data) {
+  if (!/^data:image\/(png|jpeg);base64,/.test(data)) throw new Error('Choose a PNG or JPEG image.');
+  let bytes;
+  try { bytes = Uint8Array.from(atob(data.split(',')[1]), char => char.charCodeAt(0)); }
+  catch { throw new Error('The image could not be decoded.'); }
+  if (bytes.length > 12 * 1024 * 1024) throw new Error('Choose an image under 12 MB.');
+  let bitmap;
+  try { bitmap = await createImageBitmap(new Blob([bytes])); }
+  catch { throw new Error('The image could not be decoded.'); }
+  try {
+    if (bitmap.width * bitmap.height > 20000000) throw new Error('Use an image under 20 megapixels.');
+    const scale = Math.min(1, 1600 / Math.max(bitmap.width, bitmap.height));
+    const canvas = document.createElement('canvas');
+    canvas.width = Math.max(1, Math.round(bitmap.width * scale));
+    canvas.height = Math.max(1, Math.round(bitmap.height * scale));
+    const context = canvas.getContext('2d');
+    context.fillStyle = 'white';
+    context.fillRect(0, 0, canvas.width, canvas.height);
+    context.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
+    return canvas.toDataURL('image/jpeg', .9);
+  } finally { bitmap.close(); }
+}
+const settings = await extensionApi.storage.session.get(['token', 'provider', 'base_url', 'model', 'api_key', 'structured_json', 'no_thinking', 'max_tokens', 'input_mode']);
 token.value = settings.token || '';
-byId('provider').value = settings.provider || 'laya';
+byId('provider').value = settings.provider || 'local_api';
 byId('base-url').value = settings.base_url || 'http://127.0.0.1:1234/v1';
 byId('model').value = settings.model || '';
 byId('api-key').value = settings.api_key || '';
@@ -30,12 +66,13 @@ byId('structured-json').checked = settings.structured_json !== false;
 byId('no-thinking').checked = settings.no_thinking !== false;
 byId('max-tokens').value = settings.max_tokens || 512;
 byId('input-mode').value = settings.input_mode || 'text';
-updateInputMode();
+updateProvider();
 byId('input-mode').addEventListener('change', () => { updateInputMode(); clearResult(); });
-byId('local-settings').hidden = byId('provider').value !== 'local_api';
 byId('provider').addEventListener('change', () => {
-  byId('local-settings').hidden = byId('provider').value !== 'local_api';
-  updateInputMode();
+  byId('api-key').value = '';
+  byId('model').value = '';
+  byId('base-url').value = byId('provider').value === 'ollama' ? 'http://127.0.0.1:11434' : 'http://127.0.0.1:1234/v1';
+  updateProvider();
   clearResult();
 });
 for (const id of ['base-url', 'model', 'api-key', 'structured-json', 'no-thinking', 'max-tokens']) byId(id).addEventListener('input', clearResult);
@@ -58,19 +95,25 @@ async function run(message, action) {
   finally { buttons.forEach(button => button.disabled = false); }
 }
 
-byId('save').addEventListener('click', () => run('Saving token…', async () => {
-  await chrome.storage.session.set({ token: token.value.trim(), provider: byId('provider').value, base_url: byId('base-url').value.trim(), model: byId('model').value.trim(), api_key: byId('api-key').value.trim(), structured_json: byId('structured-json').checked, no_thinking: byId('no-thinking').checked, max_tokens: Number(byId('max-tokens').value), input_mode: imageMode() ? 'image' : 'text' });
-  status.textContent = 'Token saved; provider settings saved for this browser session.';
+byId('save').addEventListener('click', () => run('Saving settings…', async () => {
+  if (byId('provider').value !== 'laya') {
+    const origin = providerOrigin({ provider: byId('provider').value, base_url: byId('base-url').value.trim() });
+    if (!await extensionApi.permissions.request({ origins: [origin] })) throw new Error('Provider access was declined. Save settings and allow access to compare.');
+  }
+  await extensionApi.storage.session.set({ token: token.value.trim(), provider: byId('provider').value, base_url: byId('base-url').value.trim(), model: byId('model').value.trim(), api_key: byId('api-key').value.trim(), structured_json: byId('structured-json').checked, no_thinking: byId('no-thinking').checked, max_tokens: Number(byId('max-tokens').value), input_mode: imageMode() ? 'image' : 'text' });
+  status.textContent = byId('provider').value === 'laya' ? 'Token saved; provider settings saved for this browser session.' : 'Provider settings saved for this browser session. Ready to capture.';
   byId('settings').open = false;
 }));
 
 async function compare(currentRevision) {
-  status.textContent = byId('provider').value === 'laya' ? 'Laya is comparing the answers. First use may download a model…' : 'Your local model is comparing the answers…';
+  status.textContent = byId('provider').value === 'laya' ? 'Laya is comparing the answers. First use may download a model…' : 'Your selected model is comparing the answers…';
   const choices = parseOptions(options.value);
   if (imageMode()) {
     if (!capturedImage) throw new Error('Capture a tab or choose an image first.');
   } else validateInput(question.value, choices);
-  const result = await request('/analyze', { question: question.value.trim(), options: choices, provider: byId('provider').value, base_url: byId('base-url').value.trim(), model: byId('model').value.trim(), api_key: byId('api-key').value.trim(), structured_json: byId('structured-json').checked, no_thinking: byId('no-thinking').checked, max_tokens: Number(byId('max-tokens').value), input_mode: imageMode() ? 'image' : 'text', ...(imageMode() ? { image: capturedImage } : {}) }, token.value);
+  const payload = { question: question.value.trim(), options: choices, provider: byId('provider').value, base_url: byId('base-url').value.trim(), model: byId('model').value.trim(), api_key: byId('api-key').value.trim(), structured_json: byId('structured-json').checked, no_thinking: byId('no-thinking').checked, max_tokens: Number(byId('max-tokens').value), input_mode: imageMode() ? 'image' : 'text', ...(imageMode() ? { image: capturedImage } : {}) };
+  if (payload.provider !== 'laya' && !await extensionApi.permissions.contains({ origins: [providerOrigin(payload)] })) throw new Error('Save settings and allow access to the selected provider first.');
+  const result = payload.provider === 'laya' ? await request('/analyze', payload, token.value) : await analyzeProvider(payload);
   if (revision !== currentRevision) { status.textContent = 'Question changed during analysis. Compare it again.'; return; }
   if (result.input_mode === 'image') {
     question.value = result.question;
@@ -95,13 +138,13 @@ byId('capture').addEventListener('click', () => run('Reading the visible page…
     if (imageMode()) {
       capturedImage = '';
       byId('image-preview').hidden = true;
-      const image = await chrome.tabs.captureVisibleTab(undefined, { format: 'png' });
+      const image = await prepareImage(await extensionApi.tabs.captureVisibleTab(undefined, { format: 'png' }));
       if (revision !== currentRevision) { status.textContent = 'Input changed during capture. Capture again when ready.'; return; }
       setImage(image);
     } else {
-      const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+      const [tab] = await extensionApi.tabs.query({ active: true, currentWindow: true });
       if (!tab?.id) throw new Error('Open a quiz tab before capturing.');
-      const frames = await chrome.scripting.executeScript({ target: { tabId: tab.id }, func: captureDOM });
+      const frames = await extensionApi.scripting.executeScript({ target: { tabId: tab.id }, func: captureDOM });
       result = frames[0]?.result;
       if (!result) throw new Error('Could not read this page. Enter the question below or use Image mode.');
       if (revision !== currentRevision) { status.textContent = 'Text changed during capture. Capture again when ready.'; return; }
@@ -141,7 +184,8 @@ byId('image-upload').addEventListener('change', () => run('Loading image…', as
     reader.onerror = () => reject(new Error('Could not read this image.'));
     reader.readAsDataURL(file);
   });
+  const image = await prepareImage(data);
   if (revision !== currentRevision) { status.textContent = 'Input changed while loading the image. Choose it again.'; return; }
-  setImage(data);
+  setImage(image);
   status.textContent = 'Image loaded. Compare with a vision-capable local model.';
 }));

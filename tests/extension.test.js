@@ -39,7 +39,7 @@ test('manifest grants temporary DOM access without unrestricted website access',
   assert.ok(manifest.permissions.includes('activeTab'));
   assert.ok(manifest.permissions.includes('scripting'));
   assert.deepEqual(manifest.host_permissions, ['http://127.0.0.1:8765/*']);
-  assert.equal(manifest.optional_host_permissions, undefined);
+  assert.deepEqual(manifest.optional_host_permissions, ['http://127.0.0.1/*', 'http://localhost/*', 'https://api.openai.com/*', 'https://api.anthropic.com/*']);
 });
 
 test('toolbar click explicitly opens the panel and disables automatic action interception', async () => {
@@ -61,4 +61,16 @@ test('toolbar click explicitly opens the panel and disables automatic action int
   assert.equal(behavior, false);
   listener({ windowId: 42 });
   assert.equal(opened, 42);
+});
+
+test('Firefox toolbar opens its native sidebar', async () => {
+  const { readFile } = await import('node:fs/promises');
+  const { runInNewContext } = await import('node:vm');
+  let listener;
+  let opened = false;
+  runInNewContext(await readFile(new URL('../extension/background.js', import.meta.url), 'utf8'), {
+    console, browser: { sidebarAction: { open: async () => { opened = true; } }, action: { onClicked: { addListener: callback => { listener = callback; } } } }
+  });
+  listener({ windowId: 42 });
+  assert.equal(opened, true);
 });
