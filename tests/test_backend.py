@@ -67,7 +67,9 @@ class CoreTests(unittest.TestCase):
         path = Path(__file__).parent / 'quiz.png'
         result = extract_image('data:image/png;base64,' + base64.b64encode(path.read_bytes()).decode())
         self.assertIn('encryption algorithm?', result['question'])
-        self.assertEqual(result['options'], ['Ciphertext', 'Payload', 'Source code', 'Plaintext'])
+        # Tesseract builds can add a trailing period to the same tile label.
+        self.assertEqual([option.rstrip('.') for option in result['options']],
+                         ['Ciphertext', 'Payload', 'Source code', 'Plaintext'])
 
     def test_math_question_without_question_mark(self):
         image = 'data:image/png;base64,' + base64.b64encode((Path(__file__).parent / 'math-quiz.png').read_bytes()).decode()
