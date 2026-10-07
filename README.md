@@ -6,6 +6,8 @@ Use LM Studio, Ollama, OpenAI, or Anthropic directly from the extension. These p
 
 ## Install
 
+Download the Chrome or Firefox archive from [the latest release](https://github.com/kevkoa2106/quizlens/releases/latest). Unzip the Chrome archive and load its folder as an unpacked extension. Firefox's temporary add-on loader can open its ZIP directly. These packages do not require Python or Node for the direct providers.
+
 Build the browser packages from source:
 
 ```sh

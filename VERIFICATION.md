@@ -4,6 +4,8 @@
 
 The backend suite includes 32 passing checks and one optional real-Laya checkpoint test. Provider and browser coverage now includes direct requests, native Ollama, cloud credentials, provider-scoped permissions, browser-side image preparation, and Chrome/Firefox package generation. The linked initial CI failure was an OCR fixture punctuation difference; the existing fix keeps answer text/order assertions while permitting a trailing period.
 
+Version 0.5.0 passed [Linux CI](https://github.com/kevkoa2106/quizlens/actions/runs/37619682656): 32 backend tests, 23 JavaScript tests, and 49 browser tests across Chromium and Firefox. The optional checkpoint test and the Firefox actual-addon smoke test are skipped; the latter is unsupported by Playwright. Mozilla's add-on linter reports zero errors, warnings, or notices for the generated Firefox package. Local macOS Chromium tests pass; the downloaded headless Firefox binary could not start a profile on that host, so Firefox engine verification used Linux CI.
+
 ## Test coverage
 
 The Python suite checks question validation, balanced Laya answer ordering, score validity, tied choices, OCR on the supplied quiz fixtures, image preparation, local API requests, structured JSON, truncated responses, answer identity, authentication, origin checks, provider dispatch, body limits, and visible processing errors.
